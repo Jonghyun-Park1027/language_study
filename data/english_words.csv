@@ -11,3 +11,5 @@ uncontaminated
 utilization
 Rotary
 Quantization-Aware Training
+equivalent
+"Optional[X] is equivalent to Union[X, None]"
