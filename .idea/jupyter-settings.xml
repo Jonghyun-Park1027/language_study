@@ -11,6 +11,14 @@
             </JupyterConnectionParameters>
           </value>
         </entry>
+        <entry key="D:/포디블록/.idea/포디블록.iml">
+          <value>
+            <JupyterConnectionParameters>
+              <option name="managed" value="true" />
+              <option name="sdkHomePath" value="C:\Users\ppjjh\anaconda3\envs\language\python.exe" />
+            </JupyterConnectionParameters>
+          </value>
+        </entry>
       </map>
     </option>
   </component>
