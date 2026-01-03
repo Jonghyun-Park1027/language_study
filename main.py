@@ -11,6 +11,9 @@ translator = Translator()
 # 번역 캐시 (같은 단어 재번역 방지)
 translation_cache = {}
 
+# 현재 카드가 영어인지 한국어인지 추적
+is_showing_english = True
+
 def translate_word(word):
     """영어 단어를 한국어로 번역"""
     if word in translation_cache:
@@ -33,6 +36,7 @@ except FileNotFoundError:
     data = pd.read_csv("data/words_to_learn(day object).csv", header=None, names=['word'])
 
 to_learn = data['word'].tolist()
+random.shuffle(to_learn)
 current_card = {}
 num = 0
 
@@ -114,82 +118,103 @@ def adjust_text_size(text, is_korean=False):
 
     return formatted_text, font_size
 
-def right_text():
-    global current_card, num, flip_timer
-    window.after_cancel(flip_timer)
+def show_english():
+    """영어 카드 표시"""
+    global is_showing_english
+    is_showing_english = True
+    canvas.itemconfigure(canvas_image, image=card_front_img)
+    canvas.itemconfigure(card_title, text="English", fill="black")
+    formatted_text, font_size = adjust_text_size(current_card["English"])
+    canvas.itemconfigure(card_word, text=formatted_text, fill="black", font=["Ariel", font_size, "bold"])
 
+def show_korean():
+    """한국어 카드 표시"""
+    global is_showing_english
+    is_showing_english = False
+    canvas.itemconfigure(canvas_image, image=card_back_img)
+    canvas.itemconfigure(card_title, text="Korean", fill="white")
+    formatted_text, font_size = adjust_text_size(current_card["Korean"], is_korean=True)
+    canvas.itemconfigure(card_word, text=formatted_text, fill="white", font=["Ariel", font_size, "bold"])
+
+def flip_card():
+    """카드 뒤집기 (영어 <-> 한국어 토글)"""
+    if not current_card:
+        return
+    if is_showing_english:
+        show_korean()
+    else:
+        show_english()
+
+def next_card():
+    """다음 단어로 이동"""
+    global current_card, num, is_showing_english
+    num += 1
+    if num < len(to_learn):
+        english_word = to_learn[num]
+        current_card = {"English": english_word, "Korean": translate_word(english_word)}
+        is_showing_english = True
+        show_english()
+    else:
+        # 모든 단어를 다 봤을 때
+        canvas.itemconfigure(card_title, text="완료!", fill="black")
+        canvas.itemconfigure(card_word, text="모든 단어를\n학습했습니다!", fill="black", font=["Ariel", 40, "bold"])
+
+def mark_known():
+    """단어를 알고 있다고 표시하고 목록에서 제거"""
+    global current_card, num
     try:
         to_learn.remove(current_card["English"])
         next_to_learn = pd.DataFrame(to_learn, columns=['word'])
         next_to_learn.to_csv("data/words_to_learn(day object).csv", index=False, header=False)
-    except ValueError:
+        # 인덱스 조정 (현재 단어가 제거되었으므로)
+        if num > 0:
+            num -= 1
+    except (ValueError, KeyError):
         pass
-
-    if num < len(to_learn):
-        english_word = to_learn[num]
-        current_card = {"English": english_word, "Korean": translate_word(english_word)}
-        canvas.itemconfigure(canvas_image, image=card_front_img)
-        canvas.itemconfigure(card_title, text="English", fill="black")
-        formatted_text, font_size = adjust_text_size(current_card["English"])
-        canvas.itemconfigure(card_word, text=formatted_text, fill="black", font=["Ariel", font_size, "bold"])
-        flip_timer = window.after(3000, next_english)
-
+    next_card()
 
 def first_text():
-    global current_card, num, flip_timer
+    """첫 번째 카드 표시"""
+    global current_card, num, is_showing_english
     if len(to_learn) > 0:
         english_word = to_learn[0]
         current_card = {"English": english_word, "Korean": translate_word(english_word)}
-        canvas.itemconfigure(canvas_image, image=card_front_img)
-        canvas.itemconfigure(card_title, text="English", fill="black")
-        formatted_text, font_size = adjust_text_size(current_card["English"])
-        canvas.itemconfigure(card_word, text=formatted_text, fill="black", font=["Ariel", font_size, "bold"])
-        flip_timer = window.after(3000, next_english)
-
-def wrong_text():
-    global current_card, num, flip_timer
-    num += 1
-    window.after_cancel(flip_timer)
-    if num < len(to_learn):
-        english_word = to_learn[num]
-        current_card = {"English": english_word, "Korean": translate_word(english_word)}
-        canvas.itemconfigure(canvas_image, image=card_front_img)
-        canvas.itemconfigure(card_title, text="English", fill="black")
-        formatted_text, font_size = adjust_text_size(current_card["English"])
-        canvas.itemconfigure(card_word, text=formatted_text, fill="black", font=["Ariel", font_size, "bold"])
-        flip_timer = window.after(3000, next_english)
-
-def next_english():
-    global num
-    canvas.itemconfigure(canvas_image, image=card_back_img)
-    canvas.itemconfigure(card_title, text="Korean", fill="white")
-    try:
-        formatted_text, font_size = adjust_text_size(current_card["Korean"], is_korean=True)
-        canvas.itemconfigure(card_word, text=formatted_text, fill="white", font=["Ariel", font_size, "bold"])
-    except KeyError:
-        print(num)
-        wrong_text()
+        is_showing_english = True
+        show_english()
 
 
 window = Tk()
 window.title("Flashy")
-# window.geometry("400x400")
 window.config(padx=50, pady=50, bg=BACKGROUND_COLOR)
-flip_timer = window.after(3000, func=first_text)
+
 canvas = Canvas(width=800, height=526, highlightthickness=0, bg=BACKGROUND_COLOR)
 card_front_img = PhotoImage(file="./images/card_front.png")
 card_back_img = PhotoImage(file="./images/card_back.png")
 right_img = PhotoImage(file="./images/right.png")
 wrong_img = PhotoImage(file="./images/wrong.png")
+flip_img = PhotoImage(file="./images/flip.png")
+next_img = PhotoImage(file="./images/next.png")
+
 canvas_image = canvas.create_image(400, 263, image=card_front_img)
-card_title = canvas.create_text(400, 150, text="Title", font=["Ariel", 40, "italic"] )
-card_word = canvas.create_text(400, 285, text="Word", font=["Ariel", 60, "bold"] )
+card_title = canvas.create_text(400, 150, text="Title", font=["Ariel", 40, "italic"])
+card_word = canvas.create_text(400, 285, text="Word", font=["Ariel", 60, "bold"], width=700)
 
-canvas.grid(row=0, column=0, columnspan=2)
-wrong_button = Button(image=wrong_img, highlightthickness=0, command=wrong_text)
+canvas.grid(row=0, column=0, columnspan=4)
+
+# 버튼들: X(모름) | 뒤집기 | 다음 | O(알고있음)
+wrong_button = Button(image=wrong_img, highlightthickness=0, command=next_card)
 wrong_button.grid(row=1, column=0)
-right_button = Button(image=right_img, highlightthickness=0, command=right_text)
-right_button.grid(row=1, column=1)
 
+flip_button = Button(image=flip_img, highlightthickness=0, command=flip_card)
+flip_button.grid(row=1, column=1)
+
+next_button = Button(image=next_img, highlightthickness=0, command=next_card)
+next_button.grid(row=1, column=2)
+
+right_button = Button(image=right_img, highlightthickness=0, command=mark_known)
+right_button.grid(row=1, column=3)
+
+# 첫 카드 표시
+window.after(100, first_text)
 
 window.mainloop()
